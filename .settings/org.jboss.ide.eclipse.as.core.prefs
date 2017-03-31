@@ -1,0 +1,2 @@
+eclipse.preferences.version=1
+org.jboss.ide.eclipse.as.core.singledeployable.deployableList=lib/jpbc-benchmark-2.0.0.jar\nlib/jpbc-test-2.0.0.jar\nlib/jpbc-crypto-2.0.0.jar\nlib/jpbc-api-2.0.0.jar\nlib/jpbc-mm-2.0.0.jar\nlib/jpbc-pbc-2.0.0.jar\nlib/jpbc-plaf-2.0.0.jar\nlib/jpbc-site-skin-2.0.0.jar\n
