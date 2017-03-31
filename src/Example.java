@@ -143,6 +143,7 @@ public class Example {
 
 //            assertEquals(true, message.equals(new String(plaintext)));
             System.out.println(new String(plaintext));
+            
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
