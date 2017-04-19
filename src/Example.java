@@ -1,4 +1,5 @@
 import it.unisa.dia.gas.crypto.circuit.BooleanCircuit;
+import it.unisa.dia.gas.crypto.circuit.BooleanCircuit.BooleanCircuitGate;
 import it.unisa.dia.gas.crypto.jpbc.fe.abe.gghsw13.engines.GGHSW13KEMEngine;
 import it.unisa.dia.gas.crypto.jpbc.fe.abe.gghsw13.generators.GGHSW13KeyPairGenerator;
 import it.unisa.dia.gas.crypto.jpbc.fe.abe.gghsw13.generators.GGHSW13ParametersGenerator;
@@ -19,14 +20,11 @@ import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.security.Security;
 import java.security.spec.AlgorithmParameterSpec;
+import java.util.ArrayList;
+import java.util.List;
 
-import static it.unisa.dia.gas.crypto.circuit.BooleanCircuit.BooleanCircuitGate;
 import static it.unisa.dia.gas.crypto.circuit.Gate.Type.*;
 
-
-/**
- * @author Angelo De Caro (jpbclib@gmail.com)
- */
 public class Example {
     protected KEMCipher kemCipher;
     protected AlgorithmParameterSpec iv;
@@ -89,8 +87,8 @@ public class Example {
     public CipherParameters keyGen(BooleanCircuit circuit) {
         GGHSW13SecretKeyGenerator keyGen = new GGHSW13SecretKeyGenerator();
         keyGen.init(new GGHSW13SecretKeyGenerationParameters(
-                (GGHSW13PublicKeyParameters) keyPair.getPublic(),
-                (GGHSW13MasterSecretKeyParameters) keyPair.getPrivate(),
+                ((GGHSW13PublicKeyParameters) keyPair.getPublic()),
+                ((GGHSW13MasterSecretKeyParameters) keyPair.getPrivate()),
                 circuit
         ));
 
@@ -120,15 +118,18 @@ public class Example {
             int n = 4;
             Example engine = new Example();
             engine.setup(n);
-
+            
+            // TODO: Here I want to store (GGHSW13PublicKeyParameters) keyPair.getPublic() and 
+            // (GGHSW13PrivateKeyParameters) keyPair.getPrivate() in files and later to retrieve from file
+            
             // Encrypt
             String message = "Hello World!!!";
             byte[] encapsulation = engine.initEncryption("1101");
             byte[] ciphertext = engine.encrypt(message);
-
-            // Decrypt
-            int q = 3;
-            BooleanCircuit circuit = new BooleanCircuit(n, q, 3, new BooleanCircuitGate[]{
+            
+            BooleanCircuitGate bcg1 = new BooleanCircuitGate(INPUT, 0, 1);
+            
+            BooleanCircuitGate[] bcgs = new BooleanCircuitGate[]{
                     new BooleanCircuitGate(INPUT, 0, 1),
                     new BooleanCircuitGate(INPUT, 1, 1),
                     new BooleanCircuitGate(INPUT, 2, 1),
@@ -138,10 +139,28 @@ public class Example {
                     new BooleanCircuitGate(OR, 5, 2, new int[]{2, 3}),
 
                     new BooleanCircuitGate(AND, 6, 3, new int[]{4, 5}),
-            });
-            byte[] plaintext = engine.decrypt(engine.keyGen(circuit)/*engine.keyPair.getPrivate()*/, encapsulation, ciphertext);
-
-//            assertEquals(true, message.equals(new String(plaintext)));
+            };
+            
+            List<BooleanCircuitGate> bcgList = new ArrayList<BooleanCircuitGate>();
+            
+            bcgList.add(bcg1);
+            bcgList.add(new BooleanCircuitGate(INPUT, 1, 1));
+            bcgList.add(new BooleanCircuitGate(INPUT, 2, 1));
+            bcgList.add(new BooleanCircuitGate(INPUT, 3, 1));
+            bcgList.add(new BooleanCircuitGate(AND, 4, 2, new int[]{0, 1}));
+            bcgList.add(new BooleanCircuitGate(OR, 5, 2, new int[]{2, 3}));
+            bcgList.add(new BooleanCircuitGate(AND, 6, 3, new int[]{4, 5}));
+            
+            // Decrypt
+            int q = 3;
+            BooleanCircuit circuit = new BooleanCircuit(n, q, 3, bcgList.toArray(new BooleanCircuitGate[bcgList.size()]));
+            
+            GGHSW13SecretKeyParameters secretKey = (GGHSW13SecretKeyParameters) engine.keyGen(circuit);
+            
+            // TODO: Want to store secretKey in file and later to retrieve from file
+            
+            byte[] plaintext = engine.decrypt(secretKey, encapsulation, ciphertext);
+            
             System.out.println(new String(plaintext));
             
         } catch (Exception e) {
