@@ -120,7 +120,10 @@ public class Example {
             engine.setup(n);
             
             // TODO: Here I want to store (GGHSW13PublicKeyParameters) keyPair.getPublic() and 
-            // (GGHSW13PrivateKeyParameters) keyPair.getPrivate() in files and later to retrieve from file
+            // (GGHSW13MasterSecretKeyParameters) keyPair.getPrivate() in files and later to retrieve from file
+            
+            GGHSW13PublicKeyParameters publicKey = (GGHSW13PublicKeyParameters) engine.keyPair.getPublic();
+            GGHSW13MasterSecretKeyParameters privateKey = (GGHSW13MasterSecretKeyParameters) engine.keyPair.getPrivate();
             
             // Encrypt
             String message = "Hello World!!!";
