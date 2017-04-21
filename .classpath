@@ -5,7 +5,7 @@
 	<classpathentry kind="lib" path="bcprov-jdk16-1.46.jar" sourcepath="C:/Users/farhanhamayun/.m2/repository/org/bouncycastle/bcprov-jdk16/1.46/bcprov-jdk16-1.46-sources.jar"/>
 	<classpathentry kind="lib" path="lib/jpbc-api-2.0.0.jar"/>
 	<classpathentry kind="lib" path="lib/jpbc-benchmark-2.0.0.jar"/>
-	<classpathentry kind="lib" path="lib/jpbc-crypto-2.0.0.jar"/>
+	<classpathentry kind="lib" path="lib/jpbc-crypto-2.0.0.jar" sourcepath="C:/Users/farhanhamayun/.m2/repository/it/unisa/dia/gas/jpbc-crypto/2.0.0/jpbc-crypto-2.0.0-sources.jar"/>
 	<classpathentry kind="lib" path="lib/jpbc-mm-2.0.0.jar"/>
 	<classpathentry kind="lib" path="lib/jpbc-pbc-2.0.0.jar"/>
 	<classpathentry kind="lib" path="lib/jpbc-plaf-2.0.0.jar"/>

@@ -1,15 +1,6 @@
 package com.abe.main;
-import static it.unisa.dia.gas.crypto.circuit.Gate.Type.AND;
-import static it.unisa.dia.gas.crypto.circuit.Gate.Type.INPUT;
-import static it.unisa.dia.gas.crypto.circuit.Gate.Type.OR;
-
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.security.Security;
@@ -24,10 +15,13 @@ import org.bouncycastle.crypto.AsymmetricCipherKeyPair;
 import org.bouncycastle.crypto.CipherParameters;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
+import com.abe.util.BitsUtil;
+import com.abe.util.CryptoConstants;
 import com.abe.util.KeyStoreUtil;
 
 import it.unisa.dia.gas.crypto.circuit.BooleanCircuit;
 import it.unisa.dia.gas.crypto.circuit.BooleanCircuit.BooleanCircuitGate;
+import it.unisa.dia.gas.crypto.circuit.BooleanGate;
 import it.unisa.dia.gas.crypto.jpbc.fe.abe.gghsw13.engines.GGHSW13KEMEngine;
 import it.unisa.dia.gas.crypto.jpbc.fe.abe.gghsw13.generators.GGHSW13KeyPairGenerator;
 import it.unisa.dia.gas.crypto.jpbc.fe.abe.gghsw13.generators.GGHSW13ParametersGenerator;
@@ -35,16 +29,12 @@ import it.unisa.dia.gas.crypto.jpbc.fe.abe.gghsw13.generators.GGHSW13SecretKeyGe
 import it.unisa.dia.gas.crypto.jpbc.fe.abe.gghsw13.params.GGHSW13EncryptionParameters;
 import it.unisa.dia.gas.crypto.jpbc.fe.abe.gghsw13.params.GGHSW13KeyPairGenerationParameters;
 import it.unisa.dia.gas.crypto.jpbc.fe.abe.gghsw13.params.GGHSW13MasterSecretKeyParameters;
-import it.unisa.dia.gas.crypto.jpbc.fe.abe.gghsw13.params.GGHSW13Parameters;
 import it.unisa.dia.gas.crypto.jpbc.fe.abe.gghsw13.params.GGHSW13PublicKeyParameters;
 import it.unisa.dia.gas.crypto.jpbc.fe.abe.gghsw13.params.GGHSW13SecretKeyGenerationParameters;
 import it.unisa.dia.gas.crypto.jpbc.fe.abe.gghsw13.params.GGHSW13SecretKeyParameters;
 import it.unisa.dia.gas.crypto.kem.cipher.engines.KEMCipher;
 import it.unisa.dia.gas.crypto.kem.cipher.params.KEMCipherDecryptionParameters;
 import it.unisa.dia.gas.crypto.kem.cipher.params.KEMCipherEncryptionParameters;
-import it.unisa.dia.gas.jpbc.Element;
-import it.unisa.dia.gas.jpbc.Pairing;
-import it.unisa.dia.gas.plaf.jpbc.field.curve.CurveElement;
 import it.unisa.dia.gas.plaf.jpbc.pairing.PairingFactory;
 import it.unisa.dia.gas.plaf.jpbc.util.concurrent.ExecutorServiceUtils;
 
@@ -53,6 +43,9 @@ public class Example {
     protected AlgorithmParameterSpec iv;
 
     protected AsymmetricCipherKeyPair keyPair;
+    
+    GGHSW13MasterSecretKeyParameters newMasterSecretKey;
+    GGHSW13PublicKeyParameters newPublicKey;
 
 
     public Example() throws GeneralSecurityException {
@@ -88,7 +81,7 @@ public class Example {
                     new KEMCipherEncryptionParameters(
                             128,
                             new GGHSW13EncryptionParameters(
-                                    (GGHSW13PublicKeyParameters) keyPair.getPublic(),
+                                    this.newPublicKey,
                                     assignment
                             )
                     ),
@@ -111,8 +104,8 @@ public class Example {
     public CipherParameters keyGen(BooleanCircuit circuit) {
         GGHSW13SecretKeyGenerator keyGen = new GGHSW13SecretKeyGenerator();
         keyGen.init(new GGHSW13SecretKeyGenerationParameters(
-                ((GGHSW13PublicKeyParameters) keyPair.getPublic()),
-                ((GGHSW13MasterSecretKeyParameters) keyPair.getPrivate()),
+                (this.newPublicKey),
+                (this.newMasterSecretKey),
                 circuit
         ));
 
@@ -137,7 +130,7 @@ public class Example {
 
         try {
             // Setup
-            int n = 4;
+            int n = CryptoConstants.N;
             Example engine = new Example();
             engine.setup(n);
             
@@ -149,20 +142,20 @@ public class Example {
             
             KeyStoreUtil.serializeMasterSecretKey(masterSecretKey, new FileOutputStream("msk.txt"));
             
-            GGHSW13MasterSecretKeyParameters newMasterSecretKey = KeyStoreUtil.deserializeMasterSecretKey(new FileInputStream("msk.txt"), masterSecretKey.getParameters().getPairing());
+            engine.newMasterSecretKey = KeyStoreUtil.deserializeMasterSecretKey(new FileInputStream("msk.txt"), masterSecretKey.getParameters().getPairing());
             
             KeyStoreUtil.serializePublicKey(publicKey, new FileOutputStream("public.txt"));
             
-            GGHSW13PublicKeyParameters newPublicKey = KeyStoreUtil.deserializePublicKey(new FileInputStream("public.txt"), publicKey.getParameters().getPairing());
+            engine.newPublicKey = KeyStoreUtil.deserializePublicKey(new FileInputStream("public.txt"), publicKey.getParameters().getPairing());
             
             // Encrypt
             String message = "Hello World!!!";
-            byte[] encapsulation = engine.initEncryption("1101");
+            byte[] encapsulation = engine.initEncryption("11011");
             byte[] ciphertext = engine.encrypt(message);
             
-            BooleanCircuitGate bcg1 = new BooleanCircuitGate(INPUT, 0, 1);
+            BooleanCircuitGate bcg1 = BitsUtil.off(0, 1);
             
-            BooleanCircuitGate[] bcgs = new BooleanCircuitGate[]{
+            /*BooleanCircuitGate[] bcgs = new BooleanCircuitGate[]{
                     new BooleanCircuitGate(INPUT, 0, 1),
                     new BooleanCircuitGate(INPUT, 1, 1),
                     new BooleanCircuitGate(INPUT, 2, 1),
@@ -172,29 +165,41 @@ public class Example {
                     new BooleanCircuitGate(OR, 5, 2, new int[]{2, 3}),
 
                     new BooleanCircuitGate(AND, 6, 3, new int[]{4, 5}),
-            };
+            };*/
             
             List<BooleanCircuitGate> bcgList = new ArrayList<BooleanCircuitGate>();
             
             bcgList.add(bcg1);
-            bcgList.add(new BooleanCircuitGate(INPUT, 1, 1));
-            bcgList.add(new BooleanCircuitGate(INPUT, 2, 1));
-            bcgList.add(new BooleanCircuitGate(INPUT, 3, 1));
-            bcgList.add(new BooleanCircuitGate(AND, 4, 2, new int[]{0, 1}));
+            bcgList.add(BitsUtil.off(1, 1));
+            bcgList.add(BitsUtil.off(2, 1));
+            bcgList.add(BitsUtil.off(3, 1));
+            bcgList.add(BitsUtil.off(4, 1));
+            /*bcgList.add(new BooleanCircuitGate(AND, 4, 2, new int[]{0, 1}));
             bcgList.add(new BooleanCircuitGate(OR, 5, 2, new int[]{2, 3}));
-            bcgList.add(new BooleanCircuitGate(AND, 6, 3, new int[]{4, 5}));
+            bcgList.add(new BooleanCircuitGate(AND, 6, 3, new int[]{4, 5}));*/
             
             // Decrypt
-            int q = 3;
-            BooleanCircuit circuit = new BooleanCircuit(n, q, 3, bcgList.toArray(new BooleanCircuitGate[bcgList.size()]));
+            int q = CryptoConstants.Q;
+            BooleanCircuit circuit = new BooleanCircuit(n, q, CryptoConstants.DEPTH, bcgList.toArray(new BooleanCircuitGate[bcgList.size()]));
             
             GGHSW13SecretKeyParameters secretKey = (GGHSW13SecretKeyParameters) engine.keyGen(circuit);
             
-            // TODO: Want to store secretKey in file and later to retrieve from file
+            for (BooleanGate gate : secretKey.getCircuit()) {
+            	int index = gate.getIndex();
+            	System.out.println(index);
+            }
             
-            byte[] plaintext = engine.decrypt(secretKey, encapsulation, ciphertext);
+            KeyStoreUtil.serializeSecretKey(secretKey, new FileOutputStream("secret.txt"));
+            
+            GGHSW13SecretKeyParameters newSecretKey = KeyStoreUtil.deserializeSecretKey(new FileInputStream("secret.txt"), 
+            		secretKey.getParameters().getPairing(), "00000");
+            
+            byte[] plaintext1 = engine.decrypt(secretKey, encapsulation, ciphertext);
+            
+            byte[] plaintext = engine.decrypt(newSecretKey, encapsulation, ciphertext);
             
             System.out.println(new String(plaintext));
+            System.out.println(new String(plaintext1));
             
             // Test
 //            secretKey.getKeyElementsAt(index)

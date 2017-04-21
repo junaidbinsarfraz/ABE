@@ -5,8 +5,10 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.HashMap;
+import java.util.Map;
 
-import it.unisa.dia.gas.crypto.circuit.BooleanCircuit.BooleanCircuitGate;
+import it.unisa.dia.gas.crypto.circuit.BooleanCircuit;
 import it.unisa.dia.gas.crypto.jpbc.fe.abe.gghsw13.params.GGHSW13MasterSecretKeyParameters;
 import it.unisa.dia.gas.crypto.jpbc.fe.abe.gghsw13.params.GGHSW13Parameters;
 import it.unisa.dia.gas.crypto.jpbc.fe.abe.gghsw13.params.GGHSW13PublicKeyParameters;
@@ -105,7 +107,7 @@ public class KeyStoreUtil {
     
     /////////////////////////////////////// Secret Key Starts /////////////////////////////////////////////
     
-    public static void serializeSecretKe(GGHSW13SecretKeyParameters secretKey, OutputStream out) throws IOException {
+    public static void serializeSecretKey(final GGHSW13SecretKeyParameters secretKey, OutputStream out) throws IOException {
     	DataOutputStream dOut = new DataOutputStream(out);
     	
     	dOut.writeInt(1); // version of the serialized format
@@ -114,50 +116,73 @@ public class KeyStoreUtil {
     	// n, circuit, keys
     	// keys : Map<Integer, Element[]>
     	
-    	int mapIndexes = 0;
+    	int minMapIndex = -1, maxMapIndex = minMapIndex;
+    	
     	
     	try {
     		
-    		while(secretKey.getKeyElementsAt(mapIndexes) != null) {
-    			mapIndexes++;
+    		while(secretKey.getKeyElementsAt(maxMapIndex++) != null) {
     		}
     		
     	} catch (Exception e) {
     		
     	}
     	
-    	dOut.writeInt(mapIndexes);
+    	maxMapIndex -= 1;
     	
-    	for(int i = 0; i < mapIndexes; i++) {
+    	dOut.writeInt(minMapIndex);
+    	dOut.writeInt(maxMapIndex);
+    	
+    	for(int i = minMapIndex; i < maxMapIndex; i++) {
     		Element[] elems = secretKey.getKeyElementsAt(i);
     		
-    		int j = 0;
+        	dOut.writeInt(elems.length);
         	
-        	try {
-    	    	while(secretKey.getKeyElementsAt(j) != null) {
-    	    		j++;
-    	    	}
-        	} catch(Exception e) {
-        		// It means that it has max j values
-        	}
+//        	System.out.println("Size : " + elems.length);
         	
-        	dOut.writeInt(j);
-        	
-        	for(int k = 0; k < j; k++) {
+        	for(int k = 0; k < elems.length; k++) {
         		serializeElement(elems[k], dOut, secretKey.getParameters().getPairing());
         	}
     		
     	}
     	
-    	// 
-    	
-//    	secretKey.getCircuit().getGateAt(0).
-    	
     	dOut.flush();
     	
     }
     
-//    private static void 
+    public static GGHSW13SecretKeyParameters deserializeSecretKey(InputStream in, final Pairing pairing, String bits) throws IOException {
+    	DataInputStream dIn = new DataInputStream(in);
+
+        int version = dIn.readInt();
+        if (version != 1) {
+            throw new RuntimeException("Unknown key format version: " + version);
+        }
+
+        int n = dIn.readInt();
+        int minMapIndex = dIn.readInt();
+        int maxMapIndex = dIn.readInt();
+        
+        Map<Integer, Element[]> keys = new HashMap<>();
+        
+        for(int i = minMapIndex; i < maxMapIndex; i++) {
+        	
+        	int elemsLength = dIn.readInt();
+        	
+        	Element[] elems = new Element[elemsLength];
+        	
+//        	System.out.println("Size : " + elems.length);
+        	
+        	for(int j = 0; j < elemsLength; j++) {
+        		elems[j] = deserializeElement(dIn, pairing);
+        	}
+        	
+        	keys.put(i, elems);
+        }
+        
+        BooleanCircuit circuit = BitsUtil.generateBooleanCircuit(bits);
+        
+        return new GGHSW13SecretKeyParameters(new GGHSW13Parameters(pairing, n), circuit, keys);
+    }
     
     /////////////////////////////////////// Secret Key Ends /////////////////////////////////////////////
 	
