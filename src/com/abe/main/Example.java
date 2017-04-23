@@ -21,7 +21,6 @@ import com.abe.util.KeyStoreUtil;
 
 import it.unisa.dia.gas.crypto.circuit.BooleanCircuit;
 import it.unisa.dia.gas.crypto.circuit.BooleanCircuit.BooleanCircuitGate;
-import it.unisa.dia.gas.crypto.circuit.BooleanGate;
 import it.unisa.dia.gas.crypto.jpbc.fe.abe.gghsw13.engines.GGHSW13KEMEngine;
 import it.unisa.dia.gas.crypto.jpbc.fe.abe.gghsw13.generators.GGHSW13KeyPairGenerator;
 import it.unisa.dia.gas.crypto.jpbc.fe.abe.gghsw13.generators.GGHSW13ParametersGenerator;
@@ -47,6 +46,7 @@ public class Example {
     GGHSW13MasterSecretKeyParameters newMasterSecretKey;
     GGHSW13PublicKeyParameters newPublicKey;
 
+    byte[] encapsulation;
 
     public Example() throws GeneralSecurityException {
         this.kemCipher = new KEMCipher(
@@ -94,6 +94,9 @@ public class Example {
 
     public byte[] encrypt(String message) {
         try {
+        	
+        	this.encapsulation = this.initEncryption("11011");
+        	
             return kemCipher.doFinal(message.getBytes());
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -112,11 +115,11 @@ public class Example {
         return keyGen.generateKey();
     }
 
-    public byte[] decrypt(CipherParameters secretKey, byte[] encapsulation, byte[] ciphertext) {
+    public byte[] decrypt(CipherParameters secretKey, byte[] ciphertext) {
         try {
             kemCipher.init(
                     false,
-                    new KEMCipherDecryptionParameters(secretKey, encapsulation, 128),
+                    new KEMCipherDecryptionParameters(secretKey, this.encapsulation, 128),
                     iv
             );
             return kemCipher.doFinal(ciphertext);
@@ -124,7 +127,27 @@ public class Example {
             throw new RuntimeException(e);
         }
     }
-
+    
+    public byte[] reEncrypt(byte[] ciphertext, String bits) {
+		return this.encrypt(new String(this.decrypt(this.generateUserKey(bits), ciphertext)));
+	}
+    
+    public CipherParameters generateUserKey(String bits) {
+		
+		// Generate Circuit 
+		
+		BooleanCircuit circuit = BitsUtil.generateBooleanCircuit(bits);
+		
+		GGHSW13SecretKeyGenerator keyGen = new GGHSW13SecretKeyGenerator();
+        keyGen.init(new GGHSW13SecretKeyGenerationParameters(
+                (GGHSW13PublicKeyParameters) keyPair.getPublic(),
+                (GGHSW13MasterSecretKeyParameters) keyPair.getPrivate(),
+                circuit
+        ));
+        
+        return keyGen.generateKey();
+	}
+	
     public static void main(String[] args) {
         Security.addProvider(new BouncyCastleProvider());
 
@@ -142,30 +165,16 @@ public class Example {
             
             KeyStoreUtil.serializeMasterSecretKey(masterSecretKey, new FileOutputStream("msk.txt"));
             
-            engine.newMasterSecretKey = KeyStoreUtil.deserializeMasterSecretKey(new FileInputStream("msk.txt"), masterSecretKey.getParameters().getPairing());
-            
             KeyStoreUtil.serializePublicKey(publicKey, new FileOutputStream("public.txt"));
+            
+            engine.newMasterSecretKey = KeyStoreUtil.deserializeMasterSecretKey(new FileInputStream("msk.txt"), masterSecretKey.getParameters().getPairing());
             
             engine.newPublicKey = KeyStoreUtil.deserializePublicKey(new FileInputStream("public.txt"), publicKey.getParameters().getPairing());
             
             // Encrypt
             String message = "Hello World!!!";
-            byte[] encapsulation = engine.initEncryption("11011");
-            byte[] ciphertext = engine.encrypt(message);
             
             BooleanCircuitGate bcg1 = BitsUtil.off(0, 1);
-            
-            /*BooleanCircuitGate[] bcgs = new BooleanCircuitGate[]{
-                    new BooleanCircuitGate(INPUT, 0, 1),
-                    new BooleanCircuitGate(INPUT, 1, 1),
-                    new BooleanCircuitGate(INPUT, 2, 1),
-                    new BooleanCircuitGate(INPUT, 3, 1),
-
-                    new BooleanCircuitGate(AND, 4, 2, new int[]{0, 1}),
-                    new BooleanCircuitGate(OR, 5, 2, new int[]{2, 3}),
-
-                    new BooleanCircuitGate(AND, 6, 3, new int[]{4, 5}),
-            };*/
             
             List<BooleanCircuitGate> bcgList = new ArrayList<BooleanCircuitGate>();
             
@@ -174,35 +183,32 @@ public class Example {
             bcgList.add(BitsUtil.off(2, 1));
             bcgList.add(BitsUtil.off(3, 1));
             bcgList.add(BitsUtil.off(4, 1));
-            /*bcgList.add(new BooleanCircuitGate(AND, 4, 2, new int[]{0, 1}));
-            bcgList.add(new BooleanCircuitGate(OR, 5, 2, new int[]{2, 3}));
-            bcgList.add(new BooleanCircuitGate(AND, 6, 3, new int[]{4, 5}));*/
             
-            // Decrypt
-            int q = CryptoConstants.Q;
-            BooleanCircuit circuit = new BooleanCircuit(n, q, CryptoConstants.DEPTH, bcgList.toArray(new BooleanCircuitGate[bcgList.size()]));
+            BooleanCircuit circuit = new BooleanCircuit(n, CryptoConstants.Q, CryptoConstants.DEPTH, 
+            		bcgList.toArray(new BooleanCircuitGate[bcgList.size()]));
             
             GGHSW13SecretKeyParameters secretKey = (GGHSW13SecretKeyParameters) engine.keyGen(circuit);
             
-            for (BooleanGate gate : secretKey.getCircuit()) {
-            	int index = gate.getIndex();
-            	System.out.println(index);
-            }
+            byte[] ciphertext = engine.encrypt(message);
             
-            KeyStoreUtil.serializeSecretKey(secretKey, new FileOutputStream("secret.txt"));
+//            engine.encrypt(new String(plaintext));
             
-            GGHSW13SecretKeyParameters newSecretKey = KeyStoreUtil.deserializeSecretKey(new FileInputStream("secret.txt"), 
-            		secretKey.getParameters().getPairing(), "00000");
+            Security.addProvider(new BouncyCastleProvider());
+    		
+    		engine.kemCipher = new KEMCipher(
+                    Cipher.getInstance("AES/CBC/PKCS7Padding", "BC"),
+                    new GGHSW13KEMEngine()
+            );
+
+            // build the initialization vector.  This example is all zeros, but it
+            // could be any value or generated using a random number generator.
+    		engine.iv = new IvParameterSpec(new byte[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
             
-            byte[] plaintext1 = engine.decrypt(secretKey, encapsulation, ciphertext);
+            ciphertext = engine.reEncrypt(ciphertext, "00001");
             
-            byte[] plaintext = engine.decrypt(newSecretKey, encapsulation, ciphertext);
+            byte[] plaintext = engine.decrypt(secretKey, ciphertext);
             
             System.out.println(new String(plaintext));
-            System.out.println(new String(plaintext1));
-            
-            // Test
-//            secretKey.getKeyElementsAt(index)
             
         } catch (Exception e) {
             e.printStackTrace();

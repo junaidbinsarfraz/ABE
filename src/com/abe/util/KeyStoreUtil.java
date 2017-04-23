@@ -185,7 +185,32 @@ public class KeyStoreUtil {
     }
     
     /////////////////////////////////////// Secret Key Ends /////////////////////////////////////////////
+    
+    /////////////////////////////////////// Encapsulation Bytes Starts /////////////////////////////////////////////
+    
+    public static void serializeEncapsulation(byte[] bytes, OutputStream out) throws Exception {
+    	DataOutputStream dOut = new DataOutputStream(out);
+    	
+    	dOut.writeInt(bytes.length);
+    	dOut.write(bytes);
+    }
+    
+    public static byte[] desreializeEncapsulation(InputStream in) throws Exception {
+    	DataInputStream dIn = new DataInputStream(in);
+
+    	final int length = dIn.readInt();
+    	
+    	byte[] bytes = new byte[length];
+    	
+    	for(int i = 0; i < length; i++) {
+    		bytes[i] = dIn.readByte();
+    	}
+    	
+    	return bytes;
+    }
 	
+    /////////////////////////////////////// Encapsulation Bytes Starts /////////////////////////////////////////////
+    
     private static void serializeElement(Element elem, DataOutputStream dOut, Pairing pairing) throws IOException {
         dOut.writeBoolean(elem == null);
         if (elem == null) {
