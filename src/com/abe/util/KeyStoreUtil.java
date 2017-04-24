@@ -77,7 +77,7 @@ public class KeyStoreUtil {
     	}
     	
     	dOut.flush();
-    	
+    	dOut.close();
     }
     
     public static GGHSW13PublicKeyParameters deserializePublicKey(InputStream in, Pairing pairing) throws IOException {
@@ -100,6 +100,8 @@ public class KeyStoreUtil {
         	elems[i] = deserializeElement(dIn, pairing);
         }
         
+        dIn.close();
+        
         return new GGHSW13PublicKeyParameters(new GGHSW13Parameters(pairing, n), alpha, elems);
     }
     
@@ -113,19 +115,13 @@ public class KeyStoreUtil {
     	dOut.writeInt(1); // version of the serialized format
     	dOut.writeInt(secretKey.getParameters().getN());
     	
-    	// n, circuit, keys
-    	// keys : Map<Integer, Element[]>
-    	
     	int minMapIndex = -1, maxMapIndex = minMapIndex;
     	
-    	
     	try {
-    		
     		while(secretKey.getKeyElementsAt(maxMapIndex++) != null) {
     		}
     		
     	} catch (Exception e) {
-    		
     	}
     	
     	maxMapIndex -= 1;
@@ -147,7 +143,7 @@ public class KeyStoreUtil {
     	}
     	
     	dOut.flush();
-    	
+    	dOut.close();
     }
     
     public static GGHSW13SecretKeyParameters deserializeSecretKey(InputStream in, final Pairing pairing, String bits) throws IOException {
@@ -181,11 +177,13 @@ public class KeyStoreUtil {
         
         BooleanCircuit circuit = BitsUtil.generateBooleanCircuit(bits);
         
+        dIn.close();
+        
         return new GGHSW13SecretKeyParameters(new GGHSW13Parameters(pairing, n), circuit, keys);
     }
     
     /////////////////////////////////////// Secret Key Ends /////////////////////////////////////////////
-    
+
     /////////////////////////////////////// Encapsulation Bytes Starts /////////////////////////////////////////////
     
     public static void serializeEncapsulation(byte[] bytes, OutputStream out) throws Exception {
@@ -193,6 +191,9 @@ public class KeyStoreUtil {
     	
     	dOut.writeInt(bytes.length);
     	dOut.write(bytes);
+    	
+    	dOut.flush();
+    	dOut.close();
     }
     
     public static byte[] desreializeEncapsulation(InputStream in) throws Exception {
@@ -206,10 +207,14 @@ public class KeyStoreUtil {
     		bytes[i] = dIn.readByte();
     	}
     	
+    	dIn.close();
+    	
     	return bytes;
     }
 	
     /////////////////////////////////////// Encapsulation Bytes Starts /////////////////////////////////////////////
+    
+    /////////////////////////////////////// Common Utilities Starts /////////////////////////////////////////////
     
     private static void serializeElement(Element elem, DataOutputStream dOut, Pairing pairing) throws IOException {
         dOut.writeBoolean(elem == null);
@@ -248,4 +253,7 @@ public class KeyStoreUtil {
     	}
     	return e;
     }
+    
+    /////////////////////////////////////// Common Utilities Ends /////////////////////////////////////////////
+    
 }

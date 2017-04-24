@@ -9,5 +9,6 @@ public interface CryptoConstants {
 	
 	String ASSIGNMENT = "11101";
 	String MASTER_SECRET_KEY_FILE = "msk.txt";
+	String ENCAPSULATION_BYTE_FILE = "encapsulation.txt";
 	
 }

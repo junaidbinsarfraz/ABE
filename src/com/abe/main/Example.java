@@ -17,6 +17,7 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 import com.abe.util.BitsUtil;
 import com.abe.util.CryptoConstants;
+import com.abe.util.FileUtil;
 import com.abe.util.KeyStoreUtil;
 
 import it.unisa.dia.gas.crypto.circuit.BooleanCircuit;
@@ -34,6 +35,7 @@ import it.unisa.dia.gas.crypto.jpbc.fe.abe.gghsw13.params.GGHSW13SecretKeyParame
 import it.unisa.dia.gas.crypto.kem.cipher.engines.KEMCipher;
 import it.unisa.dia.gas.crypto.kem.cipher.params.KEMCipherDecryptionParameters;
 import it.unisa.dia.gas.crypto.kem.cipher.params.KEMCipherEncryptionParameters;
+import it.unisa.dia.gas.jpbc.Pairing;
 import it.unisa.dia.gas.plaf.jpbc.pairing.PairingFactory;
 import it.unisa.dia.gas.plaf.jpbc.util.concurrent.ExecutorServiceUtils;
 
@@ -45,6 +47,8 @@ public class Example {
     
     GGHSW13MasterSecretKeyParameters newMasterSecretKey;
     GGHSW13PublicKeyParameters newPublicKey;
+    
+    Pairing pairing = PairingFactory.getPairing("params/mm/ctl13/toy.properties");
 
     byte[] encapsulation;
 
@@ -66,7 +70,7 @@ public class Example {
         setup.init(new GGHSW13KeyPairGenerationParameters(
                 new SecureRandom(),
                 new GGHSW13ParametersGenerator().init(
-                        PairingFactory.getPairing("params/mm/ctl13/toy.properties"),
+                		pairing,
                         n).generateParameters()
         ));
         
@@ -95,7 +99,9 @@ public class Example {
     public byte[] encrypt(String message) {
         try {
         	
-        	this.encapsulation = this.initEncryption("11011");
+        	byte[] encapsulation = this.initEncryption("11011");
+        	
+        	KeyStoreUtil.serializeEncapsulation(encapsulation, new FileOutputStream(CryptoConstants.ENCAPSULATION_BYTE_FILE));
         	
             return kemCipher.doFinal(message.getBytes());
         } catch (Exception e) {
@@ -117,9 +123,12 @@ public class Example {
 
     public byte[] decrypt(CipherParameters secretKey, byte[] ciphertext) {
         try {
+        	
+        	byte[] encapsulation = KeyStoreUtil.desreializeEncapsulation(new FileInputStream(CryptoConstants.ENCAPSULATION_BYTE_FILE));
+        	
             kemCipher.init(
                     false,
-                    new KEMCipherDecryptionParameters(secretKey, this.encapsulation, 128),
+                    new KEMCipherDecryptionParameters(secretKey, encapsulation, 128),
                     iv
             );
             return kemCipher.doFinal(ciphertext);
@@ -189,11 +198,9 @@ public class Example {
             
             GGHSW13SecretKeyParameters secretKey = (GGHSW13SecretKeyParameters) engine.keyGen(circuit);
             
-            byte[] ciphertext = engine.encrypt(message);
+            KeyStoreUtil.serializeSecretKey(secretKey, new FileOutputStream("secret.txt"));
             
-//            engine.encrypt(new String(plaintext));
-            
-            Security.addProvider(new BouncyCastleProvider());
+            /*Security.addProvider(new BouncyCastleProvider());
     		
     		engine.kemCipher = new KEMCipher(
                     Cipher.getInstance("AES/CBC/PKCS7Padding", "BC"),
@@ -203,11 +210,51 @@ public class Example {
             // build the initialization vector.  This example is all zeros, but it
             // could be any value or generated using a random number generator.
     		engine.iv = new IvParameterSpec(new byte[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
+            */
+//            ciphertext = engine.reEncrypt(ciphertext, "00001");
+    		
+            FileUtil.writeIntoFile("cipher.txt", "".getBytes(), Boolean.FALSE);
             
-            ciphertext = engine.reEncrypt(ciphertext, "00001");
+            // Add
+            byte[] ciphertext = engine.encrypt(message);
             
-            byte[] plaintext = engine.decrypt(secretKey, ciphertext);
+            FileUtil.writeIntoFile("cipher.txt", ciphertext, Boolean.TRUE);
             
+            ciphertext = FileUtil.readFile("cipher.txt");
+            
+//            System.out.println(ciphertext);
+            
+            // Update
+            byte[] plaintext = engine.decrypt(KeyStoreUtil.deserializeSecretKey(new FileInputStream("secret.txt"), engine.pairing, "00000"), ciphertext);
+            
+            ciphertext = engine.encrypt(new String(plaintext) + " new word");
+            
+            FileUtil.writeIntoFile("cipher.txt", ciphertext, Boolean.TRUE);
+            
+            ciphertext = FileUtil.readFile("cipher.txt");
+            
+//            System.out.println(ciphertext);
+            
+            // Update
+            plaintext = engine.decrypt(KeyStoreUtil.deserializeSecretKey(new FileInputStream("secret.txt"), engine.pairing, "00000"), ciphertext);
+            
+            ciphertext = engine.encrypt(new String(plaintext) + " new word");
+            
+            FileUtil.writeIntoFile("cipher.txt", ciphertext, Boolean.TRUE);
+            
+            ciphertext = FileUtil.readFile("cipher.txt");
+            
+//            System.out.println(ciphertext);
+            
+            // View
+            plaintext = engine.decrypt(KeyStoreUtil.deserializeSecretKey(new FileInputStream("secret.txt"), engine.pairing, "00000"), ciphertext);
+            
+            /*ciphertext = FileUtil.readFile("cipher.txt").getBytes();
+            
+            System.out.println(ciphertext);
+            
+            plaintext = engine.decrypt(KeyStoreUtil.deserializeSecretKey(new FileInputStream("secret.txt"), engine.pairing, "00000"), ciphertext);
+            */
             System.out.println(new String(plaintext));
             
         } catch (Exception e) {
